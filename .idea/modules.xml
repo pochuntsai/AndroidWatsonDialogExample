@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/SpeechToText.iml" filepath="$PROJECT_DIR$/SpeechToText.iml" />
+      <module fileurl="file://$PROJECT_DIR$/AndroidWatsonDialogExample.iml" filepath="$PROJECT_DIR$/AndroidWatsonDialogExample.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
     </modules>
   </component>

@@ -30,6 +30,7 @@ import com.ibm.watson.developer_cloud.speech_to_text.v1.*;
 import com.ibm.watson.developer_cloud.speech_to_text.v1.model.SpeechResults;
 import com.ibm.watson.developer_cloud.speech_to_text.v1.model.Transcript;
 import com.ibm.watson.developer_cloud.text_to_speech.v1.*;
+import com.ibm.watson.developer_cloud.text_to_speech.v1.model.Voice;
 
 import junit.framework.Assert;
 
@@ -37,7 +38,7 @@ import org.apache.commons.io.IOUtils;
 
 public class MainActivity extends Activity {
 
-	private TextView txtSpeechInput, txtPrompt;
+	private TextView txtInput, txtPrompt, txtOutput;
 	private ImageButton btnSpeak;
 	private String path="";
 	//private String path="/storage/emulated/legacy/Music/input.raw";
@@ -54,19 +55,23 @@ public class MainActivity extends Activity {
 	private RecognizeOptions RecogOptions = new RecognizeOptions();
 	public static final int RECORDING_SAMPLE_RATE = 16000;
 	public static final int PLAY_SAMPLE_RATE = 22050; //This value is sample rate of watson TTS output wav file
+	public static final String DIALOG_NAME = "liza_example";
 	private boolean isRecording = false;
 	private List<Dialog> dialogs;
 	private Conversation conversation;
 	private String conversationResult="";
+	private boolean watsonInited = false;
+	private String dialogId= "";
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 
-		txtSpeechInput = (TextView) findViewById(R.id.txtSpeechInput);
+		txtOutput = (TextView) findViewById(R.id.txtOutput);
 		btnSpeak = (ImageButton) findViewById(R.id.btnSpeak);
 		txtPrompt = (TextView) findViewById(R.id.txtPrompt);
+		txtInput = (TextView) findViewById(R.id.txtInput);
 
 		// hide the action bar
 		getActionBar().hide();
@@ -85,8 +90,12 @@ public class MainActivity extends Activity {
 			path = path + "/Music/input.raw";
 			Log.d("Brian", "path=" + path);
 		}
-		initWatsonService();
-		initRecognizeOptions();
+		if (!watsonInited) {
+			initWatsonService();
+			initRecognizeOptions();
+			watsonInited = true;
+		}
+
 	}
 
 	private void initWatsonService() {
@@ -104,28 +113,37 @@ public class MainActivity extends Activity {
 					//Get Dialogs via DialogService
 					dialogs = DialService.getDialogs();
 					if (dialogs.size() > 0) {
-						Log.d(Tag, "Dialog[0].Name=" + dialogs.get(0).getName());
-						Log.d(Tag, "Dialog[0].ID=" + dialogs.get(0).getId());
+						for (int i=0; i< dialogs.size(); i++) {
+							Log.d(Tag, "Dialog[" + i + "].Name=" + dialogs.get(i).getName());
+							Log.d(Tag, "Dialog[" + i + "].ID=" + dialogs.get(i).getId());
+							if (dialogs.get(i).getName().equals(DIALOG_NAME)) {
+								dialogId = dialogs.get(i).getId();
+							}
+						}
 					}
 					else {
 						Log.d(Tag, "There is no dialog!!!");
 					}
-					conversation = DialService.createConversation(dialogs.get(0).getId());
-					Log.d(Tag, "conversation.response=" + conversation.getResponse().get(0));
-					// Send the text to watson TTS service
-					InputStream is = TTSService.synthesize(conversation.getResponse().get(0), HttpMediaType.AUDIO_WAV);
-					Assert.assertNotNull(is);
-					byte[] data = analyzeWavData(is);
-					initPlayer();
-					audioTrack.write(data, 0, data.length);
-					is.close();
+					//Dialog[0]=pizza, Dialog[1]=liza
+					//conversation = DialService.createConversation(dialogs.get(1).getId());
+					if (!dialogId.equals("")) {
+						conversation = DialService.createConversation(dialogId);
+						Log.d(Tag, "conversation.response=" + conversation.getResponse().get(0));
+						// Send the text to watson TTS service
+						InputStream is = TTSService.synthesize(conversation.getResponse().get(0), Voice.EN_ALLISON,	HttpMediaType.AUDIO_WAV);
+						Assert.assertNotNull(is);
+						byte[] data = analyzeWavData(is);
+						initPlayer();
+						audioTrack.write(data, 0, data.length);
+						is.close();
+					}
 				} catch (Exception ex) {
 					ex.printStackTrace();
 				}
 				runOnUiThread(new Runnable() {
 					public void run() {
-						if (conversation.getResponse().get(0) != "") {
-							txtSpeechInput.setText(conversation.getResponse().get(0));
+						if (!conversation.getResponse().get(0).equals("")) {
+							txtOutput.setText(conversation.getResponse().get(0));
 						}
 					}
 				});
@@ -232,7 +250,6 @@ public class MainActivity extends Activity {
 			// gets the voice output from microphone to byte format
 
 			recorder.read(sData, 0, buffsize/2);
-			Log.d("Brian","Short writing to file" + sData.toString());
 			try {
 				// // writes the data to file from buffer
 				// // stores the voice buffer
@@ -303,23 +320,35 @@ public class MainActivity extends Activity {
 						final List<Transcript> result = transcript.getResults();
 						STTResult = result.get(0).getAlternatives().get(0).getTranscript();
 						Log.d(Tag, "STT Result(String) = " + STTResult);
+						runOnUiThread(new Runnable() {
+							public void run() {
+								if (STTResult.equals("")) {
+									txtInput.setText("STT can't recognize your speech!!");
+
+								} else {
+									txtInput.setText(STTResult);
+								}
+							}
+						});
 
 						//Send your text to Dialog Service
 						conversation = DialService.converse(conversation, STTResult);
 						testConversation(conversation);
 						Log.d(Tag, "Conversation Result(JSON String) = " + conversation.toString());
 						for (int i=0; i< conversation.getResponse().size(); i++) {
-							if (conversation.getResponse().get(i) != "") {
+							if (!conversation.getResponse().get(i).equals("")) {
 								conversationResult = conversation.getResponse().get(i);
 								break;
 							}
 						}
+
 						//Send the text to watson TTS service
 						InputStream is;
-						if (conversationResult != "") {
-							is = TTSService.synthesize(conversationResult, HttpMediaType.AUDIO_WAV);
+						if (conversationResult.equals("")) {
+							is = TTSService.synthesize(STTResult, Voice.EN_ALLISON, HttpMediaType.AUDIO_WAV);
+
 						} else {
-							is = TTSService.synthesize(STTResult, HttpMediaType.AUDIO_WAV);
+							is = TTSService.synthesize(conversationResult, Voice.EN_ALLISON, HttpMediaType.AUDIO_WAV);
 						}
 						Assert.assertNotNull(is);
 						byte[] data = analyzeWavData(is);
@@ -331,11 +360,11 @@ public class MainActivity extends Activity {
 					}
 					runOnUiThread(new Runnable() {
 						public void run() {
-							if (conversationResult != "") {
-								txtSpeechInput.setText(conversationResult);
+							if (!conversationResult.equals("")) {
+								txtOutput.setText(conversationResult);
 							}
 							else {
-								txtSpeechInput.setText(STTResult);
+								txtOutput.setText(STTResult);
 							}
 						}
 					});
