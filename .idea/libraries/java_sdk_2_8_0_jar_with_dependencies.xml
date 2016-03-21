@@ -1,7 +1,7 @@
 <component name="libraryTable">
   <library name="java-sdk-2.8.0-jar-with-dependencies">
     <CLASSES>
-      <root url="jar://$PROJECT_DIR$/libs/java-sdk-2.8.0-jar-with-dependencies.jar!/" />
+      <root url="jar://$USER_HOME$/StudioProjects/SpeechToText/libs/java-sdk-2.8.0-jar-with-dependencies.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />
